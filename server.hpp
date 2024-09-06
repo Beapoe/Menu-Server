@@ -15,7 +15,8 @@
 
 #define BUFFER_SIZE 1024
 
-struct store{
+namespace server {
+    struct store{
     std::string name;
     std::string password;
     int num_customer = 0;
@@ -80,21 +81,27 @@ SOCKET CreateConnection(SOCKET server_socket){
     return client_socket;
 }
 
-std::unique_ptr<char[]> getRequest(SOCKET server_socket){
+std::unique_ptr<char[]> getRequest(SOCKET client_socket){
     // Make request
     std::unique_ptr<ThreadPool::ThreadPool> pool = ThreadPool::ThreadPool::getInstance();
     ThreadPool::Task task;
-    task.name = "getRequest";
-    task.params = &server_socket;
-    ThreadPool::TaskFunction func = []()->std::any{
-
+    std::future<std::any> Task_future = task.result_ptr.get_future();
+    ThreadPool::TaskFunction func = [](std::any params)->std::any{
+        char buffer[BUFFER_SIZE] = {0};
+        SOCKET server_socket = std::any_cast<SOCKET>(params);
+        recv(server_socket,buffer,BUFFER_SIZE,0);
+        return buffer;
     };
-    return ;
+    pool->addTask(func,"getRequest",&client_socket,std::promise<std::any>());
+    return std::any_cast<std::unique_ptr<char[]>>(Task_future.get());
 }
 
-std::string getUrl(SOCKET server_socket){
+char* findFirst(std::unique_ptr<char[]>* buffer,int toFind){
+    return strchr(buffer->get(),toFind);
+}
+
+std::string getUrl(std::unique_ptr<char[]> buffer){
     // Make url
-    std::unique_ptr<char[]> buffer = getRequest(server_socket);
     char* url_start = findFirst(&buffer,' ')+1;
     char* url_end = strchr(url_start,' ');
     std::string url(url_start,url_end-url_start);
@@ -113,8 +120,6 @@ void createStoreFile(){
     }
 }
 
-char* findFirst(std::unique_ptr<char[]>* buffer,int toFind){
-    return strchr(buffer->get(),toFind);
 }
 
 
