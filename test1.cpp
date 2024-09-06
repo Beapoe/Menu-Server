@@ -1,25 +1,36 @@
-#include <iostream>
 #include <future>
 #include <any>
-#include <thread>
+#include <queue>
 
 struct test{
-    std::promise<test> p;
-    int val;
+    std::promise<std::any> p;
+    std::any val;
+
+    test()=default;
+    test(test&& other){
+        p = std::move(other.p);
+    }
+
+    test& operator=(test&& other){
+        p = std::move(other.p);
+        return *this;
+    }
+
+    test& operator=(const test& other)=delete;
+    test(const test& other)=delete;
 };
 
-void setVal(test &t){
-    t.val = 1;
-    t.p.set_value(t);
+int getVal(std::queue<test> tests){
+    test test = std::move(tests.front());
+    test.val = 5;
+    tests.pop();
+    return std::any_cast<int>(test.val);
 }
+
 
 int main(){
     test t;
-    std::promise<test> p;
-    std::future<test> f = p.get_future();
-    t.p = std::move(p);
-    std::thread t1(setVal, std::ref(t));
-    t1.join();
-    std::cout << f.get().val << std::endl;
+    std::queue<test> tests;
+    int val = getVal(tests);
     return 0;
 }

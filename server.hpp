@@ -6,6 +6,7 @@
 #include <vector>
 #include <cstring>
 #include <memory>
+#include <sstream>
 #include "thread_pool.hpp"
 // Windows only
 #ifdef _WIN32
@@ -27,8 +28,8 @@ bool StoreFileCreated = false;
 
 SOCKET init(int port);
 SOCKET CreateConnection(SOCKET server_socket);
-std::unique_ptr<char[]> getRequest(SOCKET client_socket);
-std::string getUrl(SOCKET server_socket);
+std::shared_ptr<char[]> getRequest(SOCKET client_socket);
+std::string getUrl(std::shared_ptr<char[]> buffer_ptr);
 
 
 SOCKET init(int port){
@@ -63,7 +64,11 @@ SOCKET init(int port){
     if(listen(server_socket,10)==-1){
         std::cout<<"Failed to listen "<<GetLastError()<<std::endl;
         exit(-1);
-    }else std::cout<<"Server is listening on port "+port<<std::endl;
+    }else{
+        std::stringstream ss;
+        ss<<port;
+        std::cout<<"Server is listening on port "+ss.str()<<std::endl;
+    }
 
     std::cout<<std::endl<<"Server init succesfully"<<std::endl;
     return server_socket;
@@ -81,26 +86,32 @@ SOCKET CreateConnection(SOCKET server_socket){
     return client_socket;
 }
 
-std::unique_ptr<char[]> getRequest(SOCKET client_socket){
+std::shared_ptr<char[]> getRequest(SOCKET client_socket){
     // Make request
     std::unique_ptr<ThreadPool::ThreadPool> pool = ThreadPool::ThreadPool::getInstance();
     ThreadPool::Task task;
-    std::future<std::any> Task_future = task.result_ptr.get_future();
     ThreadPool::TaskFunction func = [](std::any params)->std::any{
         char buffer[BUFFER_SIZE] = {0};
         SOCKET server_socket = std::any_cast<SOCKET>(params);
         recv(server_socket,buffer,BUFFER_SIZE,0);
-        return buffer;
+        char* buffer_ptr = buffer;
+        return std::shared_ptr<char[]>(buffer_ptr,std::default_delete<char[]>());
     };
-    pool->addTask(func,"getRequest",&client_socket,std::promise<std::any>());
-    return std::any_cast<std::unique_ptr<char[]>>(Task_future.get());
+    task.result_ptr = std::promise<std::any>();
+    task.name = "getRequest";
+    task.params = std::any(client_socket);
+    task.func = func;
+    std::future<std::any> Task_future = task.result_ptr.get_future();
+    pool->addTask(std::move(task));
+    std::shared_ptr<char[]> buffer = std::any_cast<std::shared_ptr<char[]>>(Task_future.get());
+    return std::move(buffer);
 }
 
-char* findFirst(std::unique_ptr<char[]>* buffer,int toFind){
-    return strchr(buffer->get(),toFind);
+char* findFirst(std::shared_ptr<char[]>* buffer_ptr,int toFind){
+    return strchr(buffer_ptr->get(),toFind);
 }
 
-std::string getUrl(std::unique_ptr<char[]> buffer){
+std::string getUrl(std::shared_ptr<char[]> buffer){
     // Make url
     char* url_start = findFirst(&buffer,' ')+1;
     char* url_end = strchr(url_start,' ');

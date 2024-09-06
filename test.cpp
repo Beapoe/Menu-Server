@@ -1,4 +1,3 @@
-#include <iostream>
 #include "server.hpp"
 
 void test(){
@@ -8,6 +7,6 @@ void test(){
 }
 
 int main(){
-    
+    test();
     return 0;
 }
