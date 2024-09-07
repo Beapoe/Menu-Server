@@ -24,7 +24,7 @@ namespace server {
 };
 
 bool StoreFileCreated = false;
-
+std::unique_ptr<ThreadPool::ThreadPool> pool = ThreadPool::ThreadPool::getInstance();
 
 SOCKET init(int port);
 SOCKET CreateConnection(SOCKET server_socket);
@@ -88,7 +88,6 @@ SOCKET CreateConnection(SOCKET server_socket){
 
 std::shared_ptr<char[]> getRequest(SOCKET client_socket){
     // Make request
-    std::unique_ptr<ThreadPool::ThreadPool> pool = ThreadPool::ThreadPool::getInstance();
     ThreadPool::Task task;
     ThreadPool::TaskFunction func = [](std::any params)->std::any{
         char buffer[BUFFER_SIZE] = {0};

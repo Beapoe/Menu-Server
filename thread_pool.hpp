@@ -61,7 +61,7 @@ namespace ThreadPool
     {
     public:
         ThreadPool();
-        ~ThreadPool() = default;
+        ~ThreadPool();
         void Delete();
         static std::unique_ptr<ThreadPool> getInstance();
 
@@ -90,7 +90,16 @@ namespace ThreadPool
         for (int current = 0; current < (CPUCore_num > 8 ? 8 : CPUCore_num); current++)
         {
             auto function = std::bind(ThreadPool::run, this, current);
-            threads.push_back(std::make_unique<std::thread>(function));
+            std::unique_ptr<std::thread> thread = std::make_unique<std::thread>(function);
+            threads.push_back(std::move(thread));
+        }
+    }
+
+    inline ThreadPool::~ThreadPool()
+    {
+        if (instance != nullptr)
+        {
+            instance->Delete();
         }
     }
 
@@ -127,39 +136,36 @@ namespace ThreadPool
                 std::lock_guard<std::mutex> lock(*tasksLock);
                 // 当一个线程想要添加任务到tasks队列时，它首先需要获取tasksLock的锁。如果锁已经被其他线程持有，那么当前线程将被阻塞，直到锁被释放。这样就可以确保同一时间只有一个线程可以修改tasks队列，从而避免了数据竞争和数据不一致的问题。
                 Task newTask(std::move(task));
-                tasks.push(newTask);
+                tasks.push(std::move(newTask));
             }
             task_num.fetch_add(1);
-            getNewTask.notify_one();
+            getNewTask.notify_all();
         }
     }
 
     inline void ThreadPool::run(int id)
     {
-        if (!running)
-        {
-            std::cout << "Thread:" << id << " finished" << std::endl
-                      << std::endl;
-        }
-        else
-        {
+        while(running){
             std::unique_lock<std::mutex> lock(*tasksLock);
             bool getNewTaskFlag = task_num.load() > 0 && tasks.size() > 0 && running;
             getNewTask.wait(lock,[getNewTaskFlag](){return getNewTaskFlag;});
             {
                 std::cout << "Thread:" << id << " is running" << std::endl;
                 std::lock_guard<std::mutex> lock(*tasksLock);
+                Task task;
                 if (tasks.size() > 0)
                 {
-                    Task task = std::move(tasks.front());
+                    task = std::move(tasks.front());
                     tasks.pop();
-                    std::cout << "Work:" << task.name << " started" << std::endl;
-                    task.result_ptr.set_value(task.func(task.params));
-                    task_num.fetch_sub(1);
-                    std::cout << "Work:" << task.name << " finished" << std::endl;
                 }
+                std::cout << "Work:" << task.name << " started" << std::endl;
+                task.result_ptr.set_value(task.func(task.params));
+
+                std::cout << "Work:" << task.name << " finished" << std::endl;
+                task_num.fetch_sub(1);
             }
         }
+        std::cout<<"Thread:"<<id<<"finished"<<std::endl;
     }
 }
 
