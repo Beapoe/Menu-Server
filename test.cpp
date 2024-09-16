@@ -1,9 +1,9 @@
-#include "server.hpp"
+#include "Servrer.hpp"
 
 void test(){
     SOCKET server_socket = server::init(1024);
-    SOCKET clien_socket = server::CreateConnection(server_socket);
-    std::cout<<server::getUrl(server::getRequest(clien_socket))<<std::endl;
+    SOCKET client_socket = server::CreateConnection(server_socket);
+    std::cout<<server::getUrl(server::getRequest(client_socket))<<std::endl;// 未知原因导致url打印异常
 }
 
 int main(){
