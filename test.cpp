@@ -1,4 +1,4 @@
-#include "Servrer.hpp"
+#include "Server.hpp"
 
 void test(){
     SOCKET server_socket = server::init(1024);

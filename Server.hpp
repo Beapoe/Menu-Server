@@ -12,6 +12,13 @@
 #ifdef _WIN32
     #include <winsock2.h>
     #pragma comment(lib, "ws2_32")
+	#define GenSock SOCKET
+#else
+	#include <sys/socket.h>
+	#include <unistd.h>
+	#include <netinet/in.h>
+	#include <arpa/inet.h>
+	#define GenSock int
 #endif
 
 #define BUFFER_SIZE 1024
@@ -20,19 +27,31 @@ namespace server {
     struct store{
     std::string name;
     std::string password;
+#ifdef _WIN32
     int num_customer = 0;
+#else
+	GenSock num_num_customer = 0;
 };
+#endif
 
+#ifndef _WIN32
+std::string GetLastError();
+#endif
 bool StoreFileCreated = false;
 std::unique_ptr<ThreadPool::ThreadPool> pool = ThreadPool::ThreadPool::getInstance();
 
-SOCKET init(int port);
-SOCKET CreateConnection(SOCKET server_socket);
-std::unique_ptr<char[]> getRequest(SOCKET client_socket);
+#ifndef _WIN32
+std::string GetLastError(){
+	return std::string(strerror(errno))+"("+std::to_string(errno)+")";
+}
+#endif
+GenSock init(int port);
+GenSock CreateConnection(GenSock server_socket);
+std::unique_ptr<char[]> getRequest(GenSock client_socket);
 std::string getUrl(std::shared_ptr<char[]> buffer_ptr);
 
 
-SOCKET init(int port){
+GenSock init(int port){
     #ifdef _WIN32
         // Call WSAStartup to initialize winsock
         WSADATA wsaData;
@@ -44,7 +63,7 @@ SOCKET init(int port){
     
 
     // Create a socket
-    SOCKET server_socket = socket(AF_INET,SOCK_STREAM,0);
+    GenSock server_socket = socket(AF_INET,SOCK_STREAM,0);
     if(server_socket == -1){
         std::cout<<"Failed to create socket "<<GetLastError()<<std::endl;
         exit(-1);
@@ -54,8 +73,13 @@ SOCKET init(int port){
     struct sockaddr_in server_address;
     server_address.sin_family = AF_INET;
     server_address.sin_port = htons(port);
+#ifdef _WIN32
     server_address.sin_addr.S_un.S_addr = inet_addr("0.0.0.0");
-    if(bind(server_socket,(struct sockaddr*)&server_address,sizeof(server_address)) == -1){
+#else
+	server_address.sin_addr.s_addr = inet_addr("0.0.0.0");
+#endif
+	socklen_t len = sizeof(server_address);
+    if(bind(server_socket,(struct sockaddr*)&server_address,len) == -1){
         std::cout<<"Failed to bind socket "<<GetLastError()<<std::endl;
         exit(-1);
     }else std::cout<<"Socket bound successfully"<<std::endl;
@@ -74,11 +98,11 @@ SOCKET init(int port){
     return server_socket;
 }
 
-SOCKET CreateConnection(SOCKET server_socket){
+GenSock CreateConnection(GenSock server_socket){
     // Awaiting for incoming connections
     struct sockaddr_in client_address;
     int client_addr_len = sizeof(struct sockaddr_in);
-    SOCKET client_socket = accept(server_socket,(sockaddr*)&client_address,&client_addr_len);
+    GenSock client_socket = accept(server_socket,(sockaddr*)&client_address,&client_addr_len);
     if(client_socket == -1){
         std::cout<<"Failed to accept connection "<<GetLastError()<<std::endl;
         exit(-1);
@@ -86,7 +110,7 @@ SOCKET CreateConnection(SOCKET server_socket){
     return client_socket;
 }
 
-std::unique_ptr<char[]> getRequest(SOCKET client_socket){
+std::unique_ptr<char[]> getRequest(GenSock client_socket){
     // Make request
     std::future<std::unique_ptr<char[]>> taskFuture = pool->addTask("getRequest",[](SOCKET client_socket)->std::unique_ptr<char[]>{
         std::unique_ptr<char[]> buffer(new char[BUFFER_SIZE]);
