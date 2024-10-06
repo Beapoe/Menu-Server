@@ -27,7 +27,7 @@ int main()
         while (true)
         {
             SOCKET client_socket = server::CreateConnection(server_socket);
-            std::cout << server::getUrl(server::getRequest(client_socket)) << std::endl;
+            server::Execute(client_socket);
         }
     }
     else
