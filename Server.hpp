@@ -227,6 +227,18 @@ namespace server
         }
     }
 
+	std::string base64_encode(const std::string& input){
+		std::string output;
+		unsigned int val =0;
+		int bitsLeft = -8;
+		fot(auto c:input){
+			val = (val<<8)+c;
+			bitsLeft += 8;
+		}
+		while(output.size()%4 != 0) output.push_back('=');
+		return output;
+	}
+
     bool isBase64(const std::string &str)
     {
         for (std::size_t i = 0; i < str.size(); ++i)
@@ -241,54 +253,20 @@ namespace server
 
     std::string base64_decode(const std::string &encoded_string)
     {
-        int in_len = encoded_string.size();
-        int i = 0;
-        int j = 0;
-        int in_ = 0;
-        unsigned char char_array_4[4], char_array_3[3];
-
-        std::string decoded_string;
-
-        while (in_len-- && (encoded_string[in_] != '=') && isBase64(std::string(1, encoded_string[in_])))
-        {
-            char_array_4[i++] = encoded_string[in_];
-            if (i == 4)
-            {
-                for (i = 0; i < 4; i++)
-                    char_array_4[i] = base64_chars.find(char_array_4[i]);
-
-                char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
-                char_array_3[1] = ((char_array_4[1] & 0x0f) << 4) + ((char_array_4[2] & 0x3c) >> 2);
-                char_array_3[2] = ((char_array_4[2] & 0x03) << 6) + char_array_4[3];
-
-                decoded_string += (char_array_3[0]);
-                if (--j)
-                    decoded_string += (char_array_3[1]);
-                if (--j)
-                    decoded_string += (char_array_3[2]);
-
-                i = 0;
-            }
-            in_++;
-        }
-
-        if (i)
-        {
-            for (j = i; j < 4; j++)
-                char_array_4[j] = 0;
-
-            for (j = 0; j < 4; j++)
-                char_array_4[j] = base64_chars.find(char_array_4[j]);
-
-            char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
-            char_array_3[1] = ((char_array_4[1] & 0x0f) << 4) + ((char_array_4[2] & 0x3c) >> 2);
-
-            decoded_string += (char_array_3[0]);
-            if (--j)
-                decoded_string += (char_array_3[1]);
-        }
-
-        return decoded_string;
+		std::vector<unsigned char> output;
+		int val = 0;
+		int bitesLeft = -8;
+		for(unsigned char c:encoded_string){
+			if(c == '=') return encoded_string;
+			const int b64 = c<128?base64_chars.find(c):0;
+			val = (val<<6)+b64;
+			bitesLeft += 6;
+			if(bitesLeft >= 0){
+				output.push_back(unsigned((val>>bitesLeft)&0xFF));
+				bitesLeft -= 8;
+			}
+		}
+		return output;
     }
 
     std::wstring s2ws(const std::string &s)
