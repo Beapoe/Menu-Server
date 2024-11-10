@@ -554,7 +554,6 @@ namespace server
     {
         std::shared_ptr<char[]> request = getRequest(client_socket);
         std::string url = getUrl(request);
-        std::cout << url << std::endl;
         Option option = getOption(url);
         switch (option)
         {
